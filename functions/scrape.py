@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+from datetime import datetime, timedelta
 from .helper import fetchBasicData
 
 def getStations(URL):
@@ -61,12 +62,34 @@ def getDay(date, station):
     return pd.DataFrame(extractData(data))
 
 def getDays(start_date, end_date, station):
-    URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={start_date}&endDate={end_date}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
-    data = fetchBasicData(URL)
-    return pd.DataFrame(extractData(data))
+    #Repeatedly runs until it hits end
+    ds = pd.DataFrame()
+    cur_start = datetime.strptime(start_date, "%Y%m%d")
+    end_date = datetime.strptime(end_date, "%Y%m%d")
+    cur_end = end_date
+    
+    while cur_start < end_date:
+        #Calculates change
+        remaining_days = (end_date - cur_start).days
+        cur_end = cur_start + timedelta(days=min(30, remaining_days))
+
+        #Call API
+        URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
+        data = fetchBasicData(URL)
+        temp = pd.DataFrame(extractData(data))
+        ds = pd.concat([ds, temp], ignore_index=True)
+        cur_start = cur_end
+    
+    return pd.DataFrame(ds)
 
 def getDayofAllStations(date, stations):
     ds = pd.DataFrame()
     for st in stations:
         ds = pd.concat([ds, getDay(date, st)], ignore_index=True)
+    return ds
+
+def getDaysofAllStations(start_date, end_date, stations):
+    ds = pd.DataFrame()
+    for st in stations:
+        ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True)
     return ds

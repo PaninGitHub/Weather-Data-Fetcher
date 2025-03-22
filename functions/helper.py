@@ -10,3 +10,5 @@ def fetchBasicData(URL):
         print(r.raise_for_status())
     data = r.json()
     return data
+
+
