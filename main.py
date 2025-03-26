@@ -10,7 +10,7 @@ stations = {'KTXHOUST2924', 'KTXHEMPS30', 'KTXHOUST4614', 'KTXHOUST3627', 'KTXAN
 
 #ds = scrape.getDayofAllStations('20241230', stations)
 start_time = time.time()
-ds = scrape.getDaysofAllStations('20240802', '20241230', stations)
+ds = scrape.getDaysofAllStations('20250102', '20250301', stations)
 end_time = time.time()
 elapsed_time = end_time - start_time
 print(f"The code took {elapsed_time} seconds to run.")
