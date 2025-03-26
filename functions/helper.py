@@ -1,4 +1,5 @@
 import requests
+import numpy
 import pandas as pd
 
 def fetchBasicData(URL):
