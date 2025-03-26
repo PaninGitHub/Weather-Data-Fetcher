@@ -59,6 +59,8 @@ def extractData(_data):
 def getDay(date, station):
     URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
     data = fetchBasicData(URL)
+    if(data == None):
+        return pd.DataFrame()   
     return pd.DataFrame(extractData(data))
 
 def getDays(start_date, end_date, station):
@@ -76,6 +78,8 @@ def getDays(start_date, end_date, station):
         #Call API
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
         data = fetchBasicData(URL)
+        if(data == None):
+            return pd.DataFrame()        
         temp = pd.DataFrame(extractData(data))
         ds = pd.concat([ds, temp], ignore_index=True)
         cur_start = cur_end
@@ -91,5 +95,6 @@ def getDayofAllStations(date, stations):
 def getDaysofAllStations(start_date, end_date, stations):
     ds = pd.DataFrame()
     for st in stations:
+        print("Fetching data from station:", st)
         ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True)
     return ds
