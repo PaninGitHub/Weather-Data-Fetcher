@@ -4,6 +4,21 @@ import pandas as pd
 from datetime import datetime, timedelta
 from .helper import fetchBasicData
 
+#Predefines each variable for efficent memory allocation. U50 means a string of max 50, U100 means a string of max 100.
+dtype = [
+    ("stationID", "U50"), ("obsTimeUtc", "U100"),
+    ("lat", "f8"), ("lon", "f8"),
+    ("solarRadiationHigh", "f8"), ("uvHigh", "f8"),
+    ("tempHigh", "f8"), ("tempLow", "f8"), ("tempAvg", "f8"),
+    ("windspeedHigh", "f8"), ("windspeedLow", "f8"), ("windspeedAvg", "f8"),
+    ("windgustHigh", "f8"), ("windgustLow", "f8"), ("windgustAvg", "f8"),
+    ("dewptHigh", "f8"), ("dewptLow", "f8"), ("dewptAvg", "f8"),
+    ("windchillHigh", "f8"), ("windchillLow", "f8"), ("windchillAvg", "f8"),
+    ("heatindexHigh", "f8"), ("heatindexLow", "f8"), ("heatindexAvg", "f8"),
+    ("pressureMax", "f8"), ("pressureMin", "f8"), ("pressureTrend", "f8"),
+    ("precipRate", "f8"), ("precipTotal", "f8")
+]
+
 def getStations(URL):
     #Fetch Data
     data = fetchBasicData(URL)
@@ -22,20 +37,7 @@ def getStations(URL):
 def extractData(_data):
     observations = _data['observations']
 
-    #Predefines each variable for efficent memory allocation. U50 means a string of max 50, U100 means a string of max 100.
-    dtype = [
-        ("stationID", "U50"), ("obsTimeUtc", "U100"),
-        ("lat", "f8"), ("lon", "f8"),
-        ("solarRadiationHigh", "f8"), ("uvHigh", "f8"),
-        ("tempHigh", "f8"), ("tempLow", "f8"), ("tempAvg", "f8"),
-        ("windspeedHigh", "f8"), ("windspeedLow", "f8"), ("windspeedAvg", "f8"),
-        ("windgustHigh", "f8"), ("windgustLow", "f8"), ("windgustAvg", "f8"),
-        ("dewptHigh", "f8"), ("dewptLow", "f8"), ("dewptAvg", "f8"),
-        ("windchillHigh", "f8"), ("windchillLow", "f8"), ("windchillAvg", "f8"),
-        ("heatindexHigh", "f8"), ("heatindexLow", "f8"), ("heatindexAvg", "f8"),
-        ("pressureMax", "f8"), ("pressureMin", "f8"), ("pressureTrend", "f8"),
-        ("precipRate", "f8"), ("precipTotal", "f8")
-    ]
+
 
     #Appends data into a Numpy array efficently using the data types provided above.
     data_array = np.array([
@@ -55,13 +57,16 @@ def extractData(_data):
     ], dtype=dtype)
     return data_array
 
-def getDay(date, station):
+def getDay(date, station, convertToDF):
     URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
     data = fetchBasicData(URL)
-    return pd.DataFrame(extractData(data))
+    if(convertToDF):
+        return pd.DataFrame(extractData(data))
+    return extractData(data)
 
-def getDays(start_date, end_date, station):
+def getDays(start_date, end_date, station, convertToDF):
     temp_data = []  # Use a list instead of concatenating DataFrames
+
     #Repeatedly runs until it hits end
     cur_start = datetime.strptime(start_date, "%Y%m%d")
     end_date = datetime.strptime(end_date, "%Y%m%d")
@@ -76,17 +81,29 @@ def getDays(start_date, end_date, station):
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
         temp_data.append(extractData(fetchBasicData(URL)))
         cur_start = cur_end
-    ds = np.array(temp_data).flatten() #Flattens data since temp_data is of type [[Dictionary]]
-    return pd.DataFrame(ds)
+
+    ds = np.array(temp_data, dtype="object").flatten() #Flattens data since temp_data is of type [[Dictionary]]. Also must specify it's an object otherwise the error "setting array element w/ sequence" is thrown.
+    if(convertToDF):
+        return pd.DataFrame(ds)
+    return ds
 
 def getDayofAllStations(date, stations):
-    ds = pd.DataFrame()
+    ds = [np.empty((0,), dtype=object)]
     for st in stations:
-        ds = pd.concat([ds, getDay(date, st)], ignore_index=True)
-    return ds
+        print(st)
+        ds = np.append(ds, getDay(date, st, False))
+    return pd.DataFrame(ds.flatten())
 
 def getDaysofAllStations(start_date, end_date, stations):
-    ds = pd.DataFrame()
+    ds = [np.empty((0,), dtype=object)]
     for st in stations:
-        ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True)
-    return ds
+        print("Now on station:", st)
+        ds = np.append(ds, getDays(start_date, end_date, st, False))
+    
+    #Handles the case where data is formatted differently if the range is more than 30 days (The API's limit)
+    start = datetime.strptime(start_date, "%Y%m%d")
+    end = datetime.strptime(end_date, "%Y%m%d")
+    remaining_days = (end - start).days
+    if(remaining_days > 30):
+        return pd.DataFrame(np.concatenate(ds))
+    return pd.DataFrame(ds)
