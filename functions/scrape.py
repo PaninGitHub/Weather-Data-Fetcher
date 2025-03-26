@@ -1,23 +1,7 @@
 import requests
-import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from .helper import fetchBasicData
-
-#Predefines each variable for efficent memory allocation. U50 means a string of max 50, U100 means a string of max 100.
-dtype = [
-    ("stationID", "U50"), ("obsTimeUtc", "U100"),
-    ("lat", "f8"), ("lon", "f8"),
-    ("solarRadiationHigh", "f8"), ("uvHigh", "f8"),
-    ("tempHigh", "f8"), ("tempLow", "f8"), ("tempAvg", "f8"),
-    ("windspeedHigh", "f8"), ("windspeedLow", "f8"), ("windspeedAvg", "f8"),
-    ("windgustHigh", "f8"), ("windgustLow", "f8"), ("windgustAvg", "f8"),
-    ("dewptHigh", "f8"), ("dewptLow", "f8"), ("dewptAvg", "f8"),
-    ("windchillHigh", "f8"), ("windchillLow", "f8"), ("windchillAvg", "f8"),
-    ("heatindexHigh", "f8"), ("heatindexLow", "f8"), ("heatindexAvg", "f8"),
-    ("pressureMax", "f8"), ("pressureMin", "f8"), ("pressureTrend", "f8"),
-    ("precipRate", "f8"), ("precipTotal", "f8")
-]
 
 def getStations(URL):
     #Fetch Data
@@ -35,39 +19,51 @@ def getStations(URL):
     return stations
 
 def extractData(_data):
-    observations = _data['observations']
+    temp = []
+    for observation in _data['observations']:
+        # Extract and append the necessary properties
+        observation_data = {
+            "stationID": observation["stationID"],
+            "obsTimeUtc": observation["obsTimeUtc"],
+            "lat": observation["lat"],
+            "lon": observation["lon"],
+            "solarRadiationHigh": observation["solarRadiationHigh"],
+            "uvHigh": observation["uvHigh"],
+            "tempHigh": observation["imperial"]["tempHigh"],
+            "tempLow": observation["imperial"]["tempLow"],
+            "tempAvg": observation["imperial"]["tempAvg"],
+            "windspeedHigh": observation["imperial"]["windspeedHigh"],
+            "windspeedLow": observation["imperial"]["windspeedLow"],
+            "windspeedAvg": observation["imperial"]["windspeedAvg"],
+            "windgustHigh": observation["imperial"]["windgustHigh"],
+            "windgustLow": observation["imperial"]["windgustLow"],
+            "windgustAvg": observation["imperial"]["windgustAvg"],
+            "dewptHigh": observation["imperial"]["dewptHigh"],
+            "dewptLow": observation["imperial"]["dewptLow"],
+            "dewptAvg": observation["imperial"]["dewptAvg"],
+            "windchillHigh": observation["imperial"]["windchillHigh"],
+            "windchillLow": observation["imperial"]["windchillLow"],
+            "windchillAvg": observation["imperial"]["windchillAvg"],
+            "heatindexHigh": observation["imperial"]["heatindexHigh"],
+            "heatindexLow": observation["imperial"]["heatindexLow"],
+            "heatindexAvg": observation["imperial"]["heatindexAvg"],
+            "pressureMax": observation["imperial"]["pressureMax"],
+            "pressureMin": observation["imperial"]["pressureMin"],
+            "pressureTrend": observation["imperial"]["pressureTrend"],
+            "precipRate": observation["imperial"]["precipRate"],
+            "precipTotal": observation["imperial"]["precipTotal"]
+        }
+        temp.append(observation_data)
+    return temp
 
-
-
-    #Appends data into a Numpy array efficently using the data types provided above.
-    data_array = np.array([
-        (
-            obs["stationID"], obs["obsTimeUtc"],
-            obs["lat"], obs["lon"],
-            obs["solarRadiationHigh"], obs["uvHigh"],
-            obs["imperial"]["tempHigh"], obs["imperial"]["tempLow"], obs["imperial"]["tempAvg"],
-            obs["imperial"]["windspeedHigh"], obs["imperial"]["windspeedLow"], obs["imperial"]["windspeedAvg"],
-            obs["imperial"]["windgustHigh"], obs["imperial"]["windgustLow"], obs["imperial"]["windgustAvg"],
-            obs["imperial"]["dewptHigh"], obs["imperial"]["dewptLow"], obs["imperial"]["dewptAvg"],
-            obs["imperial"]["windchillHigh"], obs["imperial"]["windchillLow"], obs["imperial"]["windchillAvg"],
-            obs["imperial"]["heatindexHigh"], obs["imperial"]["heatindexLow"], obs["imperial"]["heatindexAvg"],
-            obs["imperial"]["pressureMax"], obs["imperial"]["pressureMin"], obs["imperial"]["pressureTrend"],
-            obs["imperial"]["precipRate"], obs["imperial"]["precipTotal"]
-        ) for obs in observations
-    ], dtype=dtype)
-    return data_array
-
-def getDay(date, station, convertToDF):
+def getDay(date, station):
     URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
     data = fetchBasicData(URL)
-    if(convertToDF):
-        return pd.DataFrame(extractData(data))
-    return extractData(data)
+    return pd.DataFrame(extractData(data))
 
-def getDays(start_date, end_date, station, convertToDF):
-    temp_data = []  # Use a list instead of concatenating DataFrames
-
+def getDays(start_date, end_date, station):
     #Repeatedly runs until it hits end
+    ds = pd.DataFrame()
     cur_start = datetime.strptime(start_date, "%Y%m%d")
     end_date = datetime.strptime(end_date, "%Y%m%d")
     cur_end = end_date
@@ -79,31 +75,21 @@ def getDays(start_date, end_date, station, convertToDF):
 
         #Call API
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
-        temp_data.append(extractData(fetchBasicData(URL)))
+        data = fetchBasicData(URL)
+        temp = pd.DataFrame(extractData(data))
+        ds = pd.concat([ds, temp], ignore_index=True)
         cur_start = cur_end
-
-    ds = np.array(temp_data, dtype="object").flatten() #Flattens data since temp_data is of type [[Dictionary]]. Also must specify it's an object otherwise the error "setting array element w/ sequence" is thrown.
-    if(convertToDF):
-        return pd.DataFrame(ds)
-    return ds
+    
+    return pd.DataFrame(ds)
 
 def getDayofAllStations(date, stations):
-    ds = [np.empty((0,), dtype=object)]
+    ds = pd.DataFrame()
     for st in stations:
-        print(st)
-        ds = np.append(ds, getDay(date, st, False))
-    return pd.DataFrame(ds.flatten())
+        ds = pd.concat([ds, getDay(date, st)], ignore_index=True)
+    return ds
 
 def getDaysofAllStations(start_date, end_date, stations):
-    ds = [np.empty((0,), dtype=object)]
+    ds = pd.DataFrame()
     for st in stations:
-        print("Now on station:", st)
-        ds = np.append(ds, getDays(start_date, end_date, st, False))
-    
-    #Handles the case where data is formatted differently if the range is more than 30 days (The API's limit)
-    start = datetime.strptime(start_date, "%Y%m%d")
-    end = datetime.strptime(end_date, "%Y%m%d")
-    remaining_days = (end - start).days
-    if(remaining_days > 30):
-        return pd.DataFrame(np.concatenate(ds))
-    return pd.DataFrame(ds)
+        ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True)
+    return ds
