@@ -3,13 +3,15 @@ import pandas as pd
 from datetime import datetime, timedelta
 from .helper import fetchBasicData
 
+"""
+Fetches data from the API and gathers the station ids from each item in the array of features containing the points on the map 
+"""
 def getStations(URL):
     #Fetch Data
     data = fetchBasicData(URL)
     stations = []
     #Iterate
     for key, value in data.items():
-        print(type(value))
         for item, item_value in value.items():
             if item == "features":
                 for feature in item_value:
@@ -18,6 +20,12 @@ def getStations(URL):
     stations = set(stations)
     return stations
 
+"""
+Takes in JSON object data of a weather station fetched from the API and converts
+each observation/feature into an object.
+
+Returns a list of newly formatted observations.
+"""
 def extractData(_data):
     temp = []
     for observation in _data['observations']:
@@ -56,6 +64,11 @@ def extractData(_data):
         temp.append(observation_data)
     return temp
 
+"""
+Gets infomation on a station on a certain day. 
+
+Returns a pandas Dataframe of the data containing hour increments of data throughout the specified day
+"""
 def getDay(date, station):
     URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
     data = fetchBasicData(URL)
@@ -63,8 +76,19 @@ def getDay(date, station):
         return pd.DataFrame()   
     return pd.DataFrame(extractData(data))
 
+"""
+Gets infomation on a station on a section of time.
+
+The function calls the API in month-long increments, and concateantes each entry into
+a DataFrame until all days are covered. Returns the resulting DataFrame
+
+The start_date and end_date parameters must be in YYYYMMDD
+
+Example:
+Feburary 19th 2011 -> 20110219
+1/1/2001 -> 20010101
+"""
 def getDays(start_date, end_date, station):
-    #Repeatedly runs until it hits end
     ds = pd.DataFrame()
     cur_start = datetime.strptime(start_date, "%Y%m%d")
     end_date = datetime.strptime(end_date, "%Y%m%d")
@@ -75,7 +99,7 @@ def getDays(start_date, end_date, station):
         remaining_days = (end_date - cur_start).days
         cur_end = cur_start + timedelta(days=min(30, remaining_days))
 
-        #Call API
+        #Calls API and takes in data
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
         data = fetchBasicData(URL)
         if(data == None):
@@ -86,12 +110,23 @@ def getDays(start_date, end_date, station):
     
     return pd.DataFrame(ds)
 
+"""
+Takes in multiple stations and gets infomation on a specific day
+
+Returns a DataFrame
+"""
 def getDayofAllStations(date, stations):
     ds = pd.DataFrame()
     for st in stations:
+        #print("Fetching data from station:", st)
         ds = pd.concat([ds, getDay(date, st)], ignore_index=True)
     return ds
 
+"""
+Takes in muliple stations and gets infomation from a timespan
+
+Returns a DataFrame containing daily average for each station 
+"""
 def getDaysofAllStations(start_date, end_date, stations):
     ds = pd.DataFrame()
     for st in stations:
