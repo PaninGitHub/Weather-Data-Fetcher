@@ -1,10 +1,10 @@
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-from .helper import fetchBasicData
+from .helper import fetchBasicData, fetchBasicDataAsync
 from dotenv import load_dotenv
 import os 
-
+import asyncio
 
 """
 Fetches data from the API and gathers the station ids from each item in the array of features containing the points on the map 
@@ -148,6 +148,20 @@ def buildDailyWeatherURLs(start_date, end_date, station):
     #Return list of URLs
     return allURLs
 
+"""
+Takes in a list of URLs and converts it into a list of 
+JSON objects that represent API requests
+
+Reference: https://youtu.be/Ii7x4mpIhIs?si=Iwo5PImjAQliivKa&t=169
+"""
+async def gatherBasicDataAsync(urls):
+    #Take in tasks
+    tasks = []
+    for url in urls:
+        task = asyncio.create_task(fetchBasicDataAsync(url))
+        tasks.append(task)
+    res = await asyncio.gather(*tasks)
+    return res
 
 
 """
