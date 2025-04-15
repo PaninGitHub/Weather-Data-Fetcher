@@ -2,6 +2,9 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from .helper import fetchBasicData
+from dotenv import load_dotenv
+import os 
+
 
 """
 Fetches data from the API and gathers the station ids from each item in the array of features containing the points on the map 
@@ -70,7 +73,8 @@ Gets infomation on a station on a certain day.
 Returns a pandas Dataframe of the data containing hour increments of data throughout the specified day
 """
 def getDay(date, station):
-    URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
+    load_dotenv()
+    URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
     data = fetchBasicData(URL)
     if(data == None):
         return pd.DataFrame()   
@@ -100,7 +104,8 @@ def getDays(start_date, end_date, station):
         cur_end = cur_start + timedelta(days=min(30, remaining_days))
 
         #Calls API and takes in data
-        URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey=e1f10a1e78da46f5b10a1e78da96f525"
+        load_dotenv()
+        URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
         data = fetchBasicData(URL)
         if(data == None):
             return pd.DataFrame()        
