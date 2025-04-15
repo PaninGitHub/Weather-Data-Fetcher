@@ -80,6 +80,14 @@ def getDay(date, station):
         return pd.DataFrame()   
     return pd.DataFrame(extractData(data))
 
+async def getDayAsync(date, station):
+    load_dotenv()
+    URL = f"https://api.weather.com/v2/pws/history/all?stationId={station}&format=json&units=e&date={date}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
+    data = fetchBasicData(URL)
+    if(data == None):
+        return pd.DataFrame()   
+    return pd.DataFrame(extractData(data))
+
 """
 Gets infomation on a station on a section of time.
 
@@ -93,18 +101,20 @@ Feburary 19th 2011 -> 20110219
 1/1/2001 -> 20010101
 """
 def getDays(start_date, end_date, station):
+    #Gets dates
     ds = pd.DataFrame()
     cur_start = datetime.strptime(start_date, "%Y%m%d")
     end_date = datetime.strptime(end_date, "%Y%m%d")
     cur_end = end_date
-    
+    load_dotenv()
+
     while cur_start < end_date:
         #Calculates change
         remaining_days = (end_date - cur_start).days
         cur_end = cur_start + timedelta(days=min(30, remaining_days))
 
         #Calls API and takes in data
-        load_dotenv()
+
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
         data = fetchBasicData(URL)
         if(data == None):
@@ -114,6 +124,31 @@ def getDays(start_date, end_date, station):
         cur_start = cur_end
     
     return pd.DataFrame(ds)
+
+"""
+Takes in a dateframe and returns a list of needed API requests to fetch all
+data for a specific station
+
+Used for async fetching of data
+"""
+def buildDailyWeatherURLs(start_date, end_date, station):
+    #Gets dates
+    ds = pd.DataFrame()
+    cur_start = datetime.strptime(start_date, "%Y%m%d")
+    end_date = datetime.strptime(end_date, "%Y%m%d")
+    cur_end = end_date
+    load_dotenv()
+
+    #Fetch URLs
+    allURLs = []
+    while cur_start < end_date:
+        URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
+        allURLs.append(URL)
+    
+    #Return list of URLs
+    return allURLs
+
+
 
 """
 Takes in multiple stations and gets infomation on a specific day

@@ -12,4 +12,13 @@ def fetchBasicData(URL):
     data = r.json()
     return data
 
-
+async def fetchBasicDataAsync(URL):
+    #Sends async get request
+    async with requests.get(url = f"{URL}") as r:
+        #Checks if there is no invalid bad request
+        if r.status_code != requests.codes.ok:
+            r.raise_for_status()
+            return await None
+        #If it's good, return 
+        return await r.json()
+    
