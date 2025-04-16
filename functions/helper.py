@@ -1,6 +1,7 @@
 import requests
 import numpy
 import pandas as pd
+import aiohttp 
 
 def fetchBasicData(URL):
     #Sends get request and saves response as response object
@@ -12,13 +13,14 @@ def fetchBasicData(URL):
     data = r.json()
     return data
 
-async def fetchBasicDataAsync(URL):
+
+#We assume that there exists a session
+async def fetchBasicDataAsync(URL, session: aiohttp.ClientSession):
     #Sends async get request
-    async with requests.get(url = f"{URL}") as r:
-        #Checks if there is no invalid bad request
-        if r.status_code != requests.codes.ok:
-            r.raise_for_status()
-            return await None
-        #If it's good, return 
-        return await r.json()
+    async with session.get(f"{URL}") as res:
+        #Checks if there is no invalid bad request, then converts to JSON
+        if res.status != 200:
+            print("Error with async called in fetchBasicDataAsync: Got status", res.status)
+        r = await res.json()
+        return r
     

@@ -5,6 +5,7 @@ from .helper import fetchBasicData, fetchBasicDataAsync
 from dotenv import load_dotenv
 import os 
 import asyncio
+import aiohttp
 
 """
 Fetches data from the API and gathers the station ids from each item in the array of features containing the points on the map 
@@ -126,14 +127,17 @@ def getDays(start_date, end_date, station):
 
 def getDaysAsync(start_date, end_date, station):
     #Gets URLs for dates
+    print("Started process")
     allURLs = buildDailyWeatherURLs(start_date, end_date, station)
+    print("Fetched URLs")
 
     #Gathers a list of responses from async API calls to all URLs
-    res_list = gatherBasicDataAsync(allURLs)
+    res_list = asyncio.run(gatherBasicDataAsync(allURLs))
+    print("Fetched data from URLs")
 
     #Processes into a DataFrame
     ds = processMultipleBasicData(res_list)
-
+    print("Processed data; finished process")
     #Returns DataFrame, which contains all days n stuff
     return pd.DataFrame(ds)
 
@@ -154,8 +158,16 @@ def buildDailyWeatherURLs(start_date, end_date, station):
     #Fetch URLs
     allURLs = []
     while cur_start < end_date:
+        #Calculates change
+        remaining_days = (end_date - cur_start).days
+        cur_end = cur_start + timedelta(days=min(30, remaining_days))
+
+        #Fetches URL
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
         allURLs.append(URL)
+
+        #Increments cur_start appropirately      
+        cur_start = cur_end
     
     #Return list of URLs
     return allURLs
@@ -169,11 +181,12 @@ Reference: https://youtu.be/Ii7x4mpIhIs?si=Iwo5PImjAQliivKa&t=169
 async def gatherBasicDataAsync(urls):
     #Take in tasks
     tasks = []
-    for url in urls:
-        task = asyncio.create_task(fetchBasicDataAsync(url))
-        tasks.append(task)
-    res_list = await asyncio.gather(*tasks)
-    return res_list
+    async with aiohttp.ClientSession() as session:
+        for url in urls:
+            task = asyncio.create_task(fetchBasicDataAsync(url, session))
+            tasks.append(task)
+        res_list = await asyncio.gather(*tasks)
+        return res_list
 
 """
 Takes in a list of responses and processes each one, then combines them in sorted order
@@ -222,7 +235,7 @@ Takes in muliple stations and gets infomation from a timespan async
 
 Returns a DataFrame containing daily average for each station 
 """
-def getDaysofAllStationsSync(start_date, end_date, stations):
+def getDaysofAllStationsAsync(start_date, end_date, stations):
     ds = pd.DataFrame()
     for st in stations:
         print("Fetching data from station:", st)
