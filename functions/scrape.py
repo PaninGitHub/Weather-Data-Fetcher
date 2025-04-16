@@ -114,7 +114,6 @@ def getDays(start_date, end_date, station):
         cur_end = cur_start + timedelta(days=min(30, remaining_days))
 
         #Calls API and takes in data
-
         URL = f"https://api.weather.com/v2/pws/history/daily?stationId={station}&format=json&units=e&startDate={cur_start.strftime("%Y%m%d")}&endDate={cur_end.strftime("%Y%m%d")}&numericPrecision=decimal&apiKey={os.getenv('WEATHER_API_KEY')}"
         data = fetchBasicData(URL)
         if(data == None):
@@ -123,6 +122,19 @@ def getDays(start_date, end_date, station):
         ds = pd.concat([ds, temp], ignore_index=True)
         cur_start = cur_end
     
+    return pd.DataFrame(ds)
+
+def getDaysAsync(start_date, end_date, station):
+    #Gets URLs for dates
+    allURLs = buildDailyWeatherURLs(start_date, end_date, station)
+
+    #Gathers a list of responses from async API calls to all URLs
+    res_list = gatherBasicDataAsync(allURLs)
+
+    #Processes into a DataFrame
+    ds = processMultipleBasicData(res_list)
+
+    #Returns DataFrame, which contains all days n stuff
     return pd.DataFrame(ds)
 
 """
@@ -160,9 +172,26 @@ async def gatherBasicDataAsync(urls):
     for url in urls:
         task = asyncio.create_task(fetchBasicDataAsync(url))
         tasks.append(task)
-    res = await asyncio.gather(*tasks)
-    return res
+    res_list = await asyncio.gather(*tasks)
+    return res_list
 
+"""
+Takes in a list of responses and processes each one, then combines them in sorted order
+
+Meant to take in response from gatherBasicDataAsync
+"""
+def processMultipleBasicData(reslist):
+    df_list = []
+    for r in reslist:
+        df_list.append(pd.DataFrame(extractData(r)))
+    df = pd.concat(df_list)
+    
+    #Converts to datetime to then sort
+    df["obsTimeUtc"] = pd.to_datetime(df["obsTimeUtc"], utc=True)
+    df = df.sort_values(by='obsTimeUtc')
+
+    #Might need to implement grouping
+    return df
 
 """
 Takes in multiple stations and gets infomation on a specific day
@@ -186,4 +215,16 @@ def getDaysofAllStations(start_date, end_date, stations):
     for st in stations:
         print("Fetching data from station:", st)
         ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True)
+    return ds
+
+"""
+Takes in muliple stations and gets infomation from a timespan async
+
+Returns a DataFrame containing daily average for each station 
+"""
+def getDaysofAllStationsSync(start_date, end_date, stations):
+    ds = pd.DataFrame()
+    for st in stations:
+        print("Fetching data from station:", st)
+        ds = pd.concat([ds, getDaysAsync(start_date, end_date, st)], ignore_index=True)
     return ds
