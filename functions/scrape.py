@@ -147,7 +147,7 @@ def _getDays(start_date, end_date, station, isHourly=False):
         data = fetchBasicData(URL)
         if(data == None):
             return pd.DataFrame()        
-        temp = pd.DataFrame(extractDailyData(data))
+        temp = pd.DataFrame(extractHourlyData(data) if isHourly else extractDailyData(data))
         ds = pd.concat([ds, temp], ignore_index=True)
         cur_start = cur_end
     
@@ -172,20 +172,19 @@ def getDaysAsync(start_date, end_date, station):
 
     #Gathers a list of responses from async API calls to all URLs
     res_list = asyncio.run(gatherBasicDataAsync(allURLs))
-
     #Processes into a DataFrame
-    ds = processMultipleBasicData(res_list)
+    ds = processMultipleDailyData(res_list)
     #Returns DataFrame, which contains all days n stuff
     return pd.DataFrame(ds)
 
 
 def getHoursofDaysAsync(start_date, end_date, station):
     #Gets URLs for dates
-    allURLs = buildHourlyDataWeatherURLs(start_date, end_date, station)
+    allURLs = buildHourlyWeatherURLs(start_date, end_date, station)
     #Gathers a list of responses from async API calls to all URLs
     res_list = asyncio.run(gatherBasicDataAsync(allURLs))
     #Processes into a DataFrame
-    ds = processMultipleHourlyBasicData(res_list)
+    ds = processMultipleHourlyData(res_list)
     #Returns DataFrame, which contains all days n stuff
     return pd.DataFrame(ds)
 
@@ -221,15 +220,14 @@ def _buildWeatherURLs(start_date, end_date, station, isHourly = False):
 
         #Increments cur_start appropirately      
         cur_start = cur_end
-    
     #Return list of URLs
     return allURLs
 
 def buildDailyWeatherURLs(start_date, end_date, station):
-    _buildWeatherURLs(start_date, end_date, station, False)
+    return _buildWeatherURLs(start_date, end_date, station, False)
 
 def buildHourlyWeatherURLs(start_date, end_date, station):
-    _buildWeatherURLs(start_date, end_date, station, True)
+    return _buildWeatherURLs(start_date, end_date, station, True)
 
 """
 Takes in a list of URLs and converts it into a list of 
@@ -270,10 +268,10 @@ def _processMultipleBasicData(reslist, isHourly=False):
     return df
 
 def processMultipleDailyData(reslist):
-    _processMultipleBasicData(reslist,False)
+    return _processMultipleBasicData(reslist,False)
 
 def processMultipleHourlyData(reslist):
-    _processMultipleBasicData(reslist, True)
+    return _processMultipleBasicData(reslist, True)
 
 """
 Takes in multiple stations and gets infomation on a specific day
@@ -292,15 +290,21 @@ Takes in muliple stations and gets infomation from a timespan
 
 Returns a DataFrame containing daily average for each station 
 """
-def _getDataofAllStations(start_date, end_date, stations, isHourly=False):
+def _getDataofAllStations(start_date, end_date, stations, isHourly=False, isAsync=True):
     print("======STARTING PROCESS OF COLLETING WEATHER DATA======")
     ds = pd.DataFrame()
     for st in stations:
         start_time = time.time()
         if(isHourly):
-            ds = pd.concat([ds, getHoursofDays(start_date, end_date, st)], ignore_index=True)
+            if(isAsync):
+                ds = pd.concat([ds, getHoursofDaysAsync(start_date, end_date, st)], ignore_index=True) #Hourly data via async
+            else:
+                ds = pd.concat([ds, getHoursofDays(start_date, end_date, st)], ignore_index=True) #Hourly data non-async
         else:
-            ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True)
+            if(isAsync):
+                ds = pd.concat([ds, getDaysAsync(start_date, end_date, st)], ignore_index=True) #Daily data via async
+            else:
+                ds = pd.concat([ds, getDays(start_date, end_date, st)], ignore_index=True) #Daily data non-async 
         end_time = time.time()
         elapsed_time = end_time - start_time
         print("Fetched data from", st, "in", elapsed_time, "seconds")
@@ -308,35 +312,13 @@ def _getDataofAllStations(start_date, end_date, stations, isHourly=False):
     return ds
 
 def getHourlyofAllStations(start_date, end_date, stations):
-    _getDataofAllStations(start_date, end_date, stations, True)
+    return _getDataofAllStations(start_date, end_date, stations, True, False)
 
 def getDailyofAllStations(start_date, end_date, stations):
-    _getDataofAllStations(start_date, end_date, stations, False)
+    return _getDataofAllStations(start_date, end_date, stations, False, False)
 
-
-
-"""
-Takes in muliple stations and gets infomation from a timespan async
-
-Returns a DataFrame containing daily average for each station 
-"""
-def _getDataofAllStationsAsync(start_date, end_date, stations, isHourly=False):
-    print("======STARTING PROCESS OF COLLETING WEATHER DATA======")
-    ds = pd.DataFrame()
-    for st in stations:
-        start_time = time.time()
-        if isHourly:
-            ds = pd.concat([ds, getHoursofDaysAsync(start_date, end_date, st)], ignore_index=True)
-        else:
-            ds = pd.concat([ds, getDaysAsync(start_date, end_date, st)], ignore_index=True)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print("Fetched data from", st, "in", elapsed_time, "seconds")
-    print("======FINISHED PROCESS OF COLLETING WEATHER DATA======")
-    return ds
+def getHourlyofAllStationsAsync(start_date, end_date, stations):
+    return _getDataofAllStations(start_date, end_date, stations, True, True)
 
 def getDailyofAllStationsAsync(start_date, end_date, stations):
-    _getDataofAllStationsAsync(start_date, end_date, stations, False)
-
-def getDailyofAllStationsAsync(start_date, end_date, stations):
-    _getDataofAllStationsAsync(start_date, end_date, stations, True)
+    return _getDataofAllStations(start_date, end_date, stations, False, True)
